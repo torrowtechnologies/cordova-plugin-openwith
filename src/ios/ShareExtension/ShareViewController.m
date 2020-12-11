@@ -164,10 +164,10 @@
         --remainingAttachments;
         continue;
       }
-
+        
       lastDataType = [NSString stringWithFormat:@"FILE"];
 
-      [itemProvider loadItemForTypeIdentifier:@"public.image" options:nil completionHandler: ^(UIImage* item, NSError *error) {
+      [itemProvider loadItemForTypeIdentifier:@"public.image" options:nil completionHandler: ^(id<NSSecureCoding> item, NSError *error){
 
         if(error != nil){
             --remainingAttachments;
@@ -176,26 +176,44 @@
             }
         }
 
-        NSData *imageData = UIImagePNGRepresentation(item);
-        NSString *fileUrl = [self saveDataToAppGroupFolder:imageData];
-
-        NSString *uti = @"public.image";
-        NSString *registeredType = nil;
-
+        NSData *data = [[NSData alloc] init];
+          
+        NSString *name = @"";
+        NSString *fileUrl = @"";
+          
+        NSString *uti = @"";
+        NSArray<NSString *> *utis = [NSArray new];
         if ([itemProvider.registeredTypeIdentifiers count] > 0) {
-          registeredType = itemProvider.registeredTypeIdentifiers[0];
-        } else {
-          registeredType = uti;
+            uti = itemProvider.registeredTypeIdentifiers[0];
+            utis = itemProvider.registeredTypeIdentifiers;
         }
-
-        NSString *mimeType =  [self mimeTypeFromUti:registeredType];
+        else {
+            uti = @"public.image";
+        }
+          
+        if([(NSObject*)item isKindOfClass:[NSURL class]]) {
+            fileUrl = [self saveFileToAppGroupFolder:(NSURL*)item];
+            name = [[(NSURL*)item path] lastPathComponent];
+        }
+        if([(NSObject*)item isKindOfClass:[UIImage class]]) {
+            data = UIImagePNGRepresentation((UIImage*)item);
+            name = uti;
+        }
+          
+        if ([itemProvider respondsToSelector:NSSelectorFromString(@"getSuggestedName")])
+        {
+            name = [itemProvider valueForKey:@"suggestedName"];
+        }
+          
+        NSString *base64 = [self base64forData: data];
+          
         NSDictionary *dict = @{
           @"text" : self.contentText,
-          @"fileUrl" : fileUrl,
+          @"data" : base64,
+          @"fileUrl": fileUrl,
           @"uti"  : uti,
           @"utis" : itemProvider.registeredTypeIdentifiers,
-          @"name" : @"",
-          @"type" : mimeType
+          @"name" : name,
         };
 
         [items addObject:dict];
@@ -355,14 +373,19 @@
         [self debug:[NSString stringWithFormat:@"public.data = %@", item]];
 
         NSString *base64 = [self base64forData: item];
-
+          
+          NSString *suggestedName = @"";
+          if ([itemProvider respondsToSelector:NSSelectorFromString(@"getSuggestedName")]) {
+              suggestedName = [itemProvider valueForKey:@"suggestedName"];
+          }
+          
         NSString *uti = @"public.data";
         NSDictionary *dict = @{
           @"text" : self.contentText,
           @"data" : base64,
           @"uti": uti,
           @"utis": itemProvider.registeredTypeIdentifiers,
-          @"name": @"",
+          @"name": suggestedName,
           @"type": [self mimeTypeFromUti:uti],
        };
 
